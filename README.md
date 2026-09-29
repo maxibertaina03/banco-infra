@@ -111,6 +111,7 @@ sudo mkdir -p /opt/orbital && sudo chown maxi:maxi /opt/orbital && cd /opt/orbit
 git clone https://github.com/maxibertaina03/banco-backend.git
 git clone https://github.com/maxibertaina03/banco-frontend.git
 git clone https://github.com/maxibertaina03/banco-proveedores.git
+git clone https://github.com/maxibertaina03/banco-landing.git
 git clone https://github.com/maxibertaina03/banco-infra.git
 
 cd banco-infra
@@ -207,8 +208,11 @@ romper la base por accidente.
 
 ## La landing
 
-Hoy `landing/index.html` es un placeholder con un link al portal. Cuando hagas la
-landing de verdad, reemplazás el contenido de esa carpeta y listo: nginx ya la
-sirve en el dominio raíz y el certificado ya la cubre. Si en algún momento
-necesita build propio (Astro, por ejemplo), se agrega como un contenedor más y se
-cambia el `root` por un `proxy_pass` en `nginx/plantillas/landing.conf`.
+Vive en el repo `banco-landing`, al lado de este, y nginx la sirve directo desde
+ahí: son archivos estáticos, sin build. Para publicar un cambio alcanza con
+`git pull` en esa carpeta (o `./scripts/deploy.sh`, que ya la incluye); no hace
+falta reconstruir ninguna imagen ni reiniciar nada.
+
+Si algún día necesita build propio (Astro, por ejemplo), se agrega como un
+contenedor más y se cambia el `root` por un `proxy_pass` en
+`nginx/plantillas/landing.conf`.

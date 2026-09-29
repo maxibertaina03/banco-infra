@@ -17,7 +17,7 @@ RAIZ="$(cd .. && pwd)"
 SERVICIO="${1:-}"
 
 echo "→ Trayendo cambios"
-for repo in banco-backend banco-frontend banco-proveedores banco-infra; do
+for repo in banco-backend banco-frontend banco-proveedores banco-landing banco-infra; do
   if [[ -d "$RAIZ/$repo/.git" ]]; then
     printf '   %-20s ' "$repo"
     git -C "$RAIZ/$repo" pull --ff-only --quiet && git -C "$RAIZ/$repo" log -1 --format='%h %s'
