@@ -1,0 +1,7 @@
+# Secretos: sólo viven en el servidor.
+.env
+env/*.env
+!env/*.env.example
+
+# Lo genera scripts/certificados.sh a partir de nginx/plantillas/.
+nginx/https.d/*.conf

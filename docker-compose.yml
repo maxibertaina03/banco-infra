@@ -1,0 +1,127 @@
+# Banco Orbital en el droplet.
+#
+# Cinco contenedores, una sola puerta: nginx. El backend, el mock de
+# proveedores y los estáticos del portal viven en una red interna y no publican
+# ningún puerto al exterior.
+#
+#   docker compose up -d --build     levantar / actualizar
+#   docker compose ps                estado
+#   docker compose logs -f backend   mirar el backend
+#
+# La base de datos NO está acá: sigue siendo la de Supabase.
+
+name: orbital
+
+# Un droplet de 10 GB se llena con logs sin que te des cuenta. Tres archivos de
+# 10 MB por contenedor es suficiente para investigar un problema de ayer.
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ── Mock de proveedores (servicios y recargas) ─────────────────────────────
+  # Sólo lo consume el backend por la red interna. No tiene `ports`: desde
+  # internet no existe.
+  proveedores:
+    build:
+      context: ../banco-proveedores
+    env_file:
+      - ./env/proveedores.env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    restart: unless-stopped
+    init: true
+    networks: [interna]
+    logging: *logs
+
+  # ── API del banco ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ../banco-backend
+    env_file:
+      - ./env/backend.env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      # Nombre del servicio en la red de Docker, no localhost: cada contenedor
+      # tiene su propio localhost.
+      PROVEEDORES_URL: http://proveedores:4000
+      # El droplet corre en UTC. Sin esto, `hoyLocal()` (utils/fechas.js) fecha
+      # como "mañana" todo lo que pase después de las 21 h argentinas: un
+      # préstamo otorgado el lunes a la noche quedaría con fecha del martes.
+      TZ: America/Argentina/Buenos_Aires
+      CORS_ORIGINS: https://${DOMINIO_APP}
+    depends_on:
+      proveedores:
+        condition: service_healthy
+    restart: unless-stopped
+    init: true
+    networks: [interna]
+    logging: *logs
+
+  # ── Portal ya compilado ─────────────────────────────────────────────────────
+  # Las VITE_* se hornean en el bundle durante el build, así que cambiar la
+  # clave de Clerk obliga a reconstruir la imagen (no alcanza con reiniciar).
+  frontend:
+    build:
+      context: ../banco-frontend
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_API_BASE_URL: ""
+        VITE_PAGOS_MOCK: "false"
+    restart: unless-stopped
+    networks: [interna]
+    logging: *logs
+
+  # ── nginx: TLS y reparto ────────────────────────────────────────────────────
+  # El único que publica puertos. El bucle del command recarga la configuración
+  # cada 6 horas para tomar los certificados que renueva certbot sin que haya
+  # que entrar por SSH.
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/https.d:/etc/nginx/https.d:ro
+      - ./landing:/var/www/landing:ro
+      - certbot-webroot:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt:ro
+    command: >
+      /bin/sh -c "while :; do sleep 6h & wait $${!}; nginx -s reload; done & nginx -g 'daemon off;'"
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    networks: [interna]
+    logging: *logs
+
+  # ── Renovación de certificados ──────────────────────────────────────────────
+  # Let's Encrypt dura 90 días y renueva a partir de los 60. Intentar cada 12
+  # horas es lo que recomienda certbot: si un intento falla, quedan semanas de
+  # margen para los siguientes.
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    restart: unless-stopped
+    logging: *logs
+
+networks:
+  interna:
+    driver: bridge
+
+volumes:
+  # Certificados y claves privadas. Es el volumen que hay que respaldar si
+  # alguna vez se recrea el droplet (o se vuelven a emitir, que también sirve).
+  letsencrypt:
+  # Donde certbot deja el archivito que Let's Encrypt viene a leer por HTTP
+  # para comprobar que el dominio es tuyo.
+  certbot-webroot:

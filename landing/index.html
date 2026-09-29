@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Banco Orbital</title>
+    <meta name="description" content="Banco Orbital — home banking." />
+    <!-- Placeholder hasta que exista la landing de verdad. Lo único que tiene
+         que hacer por ahora es no dejar el dominio raíz en un 404 y llevar a
+         la gente al portal. -->
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: radial-gradient(120% 120% at 50% 0%, #2D1548 0%, #14061F 60%);
+        color: #F5F3FF;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        text-align: center;
+      }
+      .orbita {
+        width: 88px; height: 88px; margin: 0 auto 28px;
+        border-radius: 50%;
+        border: 2px solid rgba(168, 85, 247, .5);
+        display: grid; place-items: center;
+        animation: girar 12s linear infinite;
+      }
+      .orbita::after {
+        content: ""; width: 14px; height: 14px; border-radius: 50%;
+        background: #A855F7; transform: translateY(-44px);
+        box-shadow: 0 0 18px #A855F7;
+      }
+      @keyframes girar { to { transform: rotate(360deg); } }
+      h1 { font-size: clamp(2rem, 7vw, 3rem); margin: 0 0 12px; font-weight: 600; }
+      p { margin: 0 0 32px; color: #C4B5FD; font-size: 1.05rem; }
+      a {
+        display: inline-block; padding: 14px 32px; border-radius: 999px;
+        background: #A855F7; color: #14061F; text-decoration: none; font-weight: 600;
+      }
+      a:hover { background: #C084FC; }
+      small { display: block; margin-top: 40px; color: #7C6A99; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="orbita" aria-hidden="true"></div>
+      <h1>Banco Orbital</h1>
+      <p>Tu banco, en órbita.</p>
+      <a href="https://app.orbitalbank.com.ar">Entrar al portal</a>
+      <small>Proyecto académico. No es una entidad financiera real.</small>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,67 @@
+# El mismo sistema, en tu máquina, para probar los contenedores antes de subir
+# nada al droplet.
+#
+#   docker compose -f docker-compose.local.yml up --build
+#   → portal en http://localhost:8080
+#
+# Diferencias con el de producción: no hay TLS ni certbot (nginx escucha en
+# 8080), y las variables salen de env/backend.env, el mismo archivo. La base es
+# la misma de Supabase: cuidado, lo que toques acá se toca de verdad.
+
+name: orbital-local
+
+services:
+  proveedores:
+    build:
+      context: ../banco-proveedores
+    env_file:
+      - ./env/proveedores.env
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+    init: true
+    networks: [interna]
+
+  backend:
+    build:
+      context: ../banco-backend
+    env_file:
+      - ./env/backend.env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      PROVEEDORES_URL: http://proveedores:4000
+      CORS_ORIGINS: http://localhost:8080
+      TZ: America/Argentina/Buenos_Aires
+      # Un solo sincronizador a la vez: si tenés el backend corriendo aparte con
+      # `npm run dev`, este no tiene que salir a pedir transferencias también.
+      SINCRONIZAR_ENTRANTES: "false"
+    depends_on:
+      proveedores:
+        condition: service_healthy
+    init: true
+    networks: [interna]
+
+  frontend:
+    build:
+      context: ../banco-frontend
+      args:
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
+        VITE_API_BASE_URL: ""
+        VITE_PAGOS_MOCK: "false"
+    networks: [interna]
+
+  proxy:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks: [interna]
+
+networks:
+  interna:
+    driver: bridge
