@@ -76,6 +76,16 @@ services:
     networks: [interna]
     logging: *logs
 
+  # ── Landing ─────────────────────────────────────────────────────────────────
+  # La cara pública, en el dominio raíz. Es React compilado a estáticos: la
+  # imagen final es nginx con el dist adentro, sin Node.
+  landing:
+    build:
+      context: ../banco-landing
+    restart: unless-stopped
+    networks: [interna]
+    logging: *logs
+
   # ── nginx: TLS y reparto ────────────────────────────────────────────────────
   # El único que publica puertos. El bucle del command recarga la configuración
   # cada 6 horas para tomar los certificados que renueva certbot sin que haya
@@ -88,8 +98,6 @@ services:
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/https.d:/etc/nginx/https.d:ro
-      # La landing vive en su propio repo, al lado de este.
-      - ../banco-landing:/var/www/landing:ro
       - certbot-webroot:/var/www/certbot
       - letsencrypt:/etc/letsencrypt:ro
     command: >
@@ -97,6 +105,7 @@ services:
     depends_on:
       - frontend
       - backend
+      - landing
     restart: unless-stopped
     networks: [interna]
     logging: *logs
