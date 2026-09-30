@@ -39,7 +39,7 @@ que lo que toques acá se toca en serio.
 DigitalOcean → Create Droplet:
 
 - **Ubuntu 24.04 LTS**
-- **Basic / Regular · US$4/mes** (512 MB, 1 vCPU, 10 GB)
+- **Basic / Regular · US$6/mes** (1 GB, 1 vCPU, 25 GB)
 - Región **NYC3** (la de mejor latencia desde Argentina)
 - Autenticación por **SSH key** (nunca contraseña)
 
@@ -68,10 +68,11 @@ ufw allow OpenSSH && ufw allow 80 && ufw allow 443 && ufw --force enable
 apt update && apt install -y unattended-upgrades
 ```
 
-**La swap no es opcional en 512 MB**: es lo que permite compilar el portal.
+Con 1 GB la swap es una red de seguridad, no una necesidad: el portal compila
+sin tocarla. Igual conviene dejarla, que es gratis.
 
 ```bash
-fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+fallocate -l 1G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
 echo '/swapfile none swap sw 0 0' >> /etc/fstab
 sysctl -w vm.swappiness=10 && echo 'vm.swappiness=10' >> /etc/sysctl.conf
 free -h
@@ -129,7 +130,7 @@ por IPv4 y la conexión directa del plan gratis puede resolver sólo por IPv6.
 ### 6. Levantar y emitir los certificados
 
 ```bash
-docker compose up -d --build     # tarda unos minutos, la swap trabaja
+docker compose up -d --build     # la primera vez tarda unos minutos
 docker compose ps
 
 ./scripts/certificados.sh --prueba   # ensayo, no gasta intentos
@@ -200,7 +201,7 @@ romper la base por accidente.
 | El portal carga en blanco | Casi siempre el `index.html` viejo en caché del navegador. Recargar con Ctrl+Shift+R. |
 | Clerk no aparece | El dominio no está en la lista de permitidos de Clerk, o el `VITE_CLERK_PUBLISHABLE_KEY` con el que se compiló está mal. Ojo: cambiarlo obliga a `--build`, no alcanza con reiniciar. |
 | `db: disconnected` en /api/health | La `DATABASE_URL`, o Supabase pausó el proyecto por inactividad. |
-| El build se queda colgado | Es la swap. Con 512 MB el frontend tarda 2-4 minutos, no está roto. `docker stats` para confirmar que se mueve. |
+| El build parece colgado | Compilar el portal lleva un rato. `docker stats` para confirmar que se mueve. |
 | Sin espacio en disco | `docker system prune -af --volumes` (cuidado: `--volumes` borraría los certificados; sin esa bandera es seguro). |
 | El certificado venció | `docker compose logs certbot`. Reemitir: `./scripts/certificados.sh`. |
 
