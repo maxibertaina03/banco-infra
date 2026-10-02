@@ -207,6 +207,20 @@ romper la base por accidente.
 
 ---
 
+## Cloudflare adelante
+
+`nginx/conf.d/05-cloudflare.conf` hace que nginx tome la IP real del cliente del
+header `CF-Connecting-IP`, y sólo cuando la conexión viene de los rangos de
+Cloudflare. Sin eso, con el CDN adelante el rate limit le contaría las requests
+de todos a una sola IP y la auditoría guardaría la de Cloudflare.
+
+En el panel de Cloudflare, el modo SSL tiene que ser **Full (strict)**: el
+origen ya tiene un certificado de Let's Encrypt válido. Con "Flexible" el
+redirect a HTTPS de nginx entra en un bucle infinito.
+
+Los rangos cambian muy de vez en cuando; para actualizarlos:
+`curl -s https://www.cloudflare.com/ips-v4`
+
 ## La landing
 
 Vive en el repo `banco-landing`, al lado de este, y nginx la sirve directo desde
