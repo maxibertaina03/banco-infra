@@ -34,9 +34,17 @@ set -a; source .env; set +a
 # "la autoridad" y no "Let's Encrypt".
 : "${CERTBOT_EMAIL:?Falta CERTBOT_EMAIL en .env (es donde la autoridad avisa si algo falla)}"
 
+# El ensayo usa un NOMBRE DE CERTIFICADO distinto del real.
+#
+# Si los dos usaran el mismo, pasa esto: el ensayo deja un certificado de
+# staging en /etc/letsencrypt/live/$DOMINIO/, y cuando después pedís el de
+# verdad, certbot ve que ya hay uno y contesta "not yet due for renewal; no
+# action taken". Te quedás con el de mentira puesto y el navegador lo rechaza.
 STAGING=""
+NOMBRE_CERT="$DOMINIO"
 if [[ "${1:-}" == "--prueba" ]]; then
   STAGING="--staging"
+  NOMBRE_CERT="$DOMINIO-ensayo"
   echo "→ Modo prueba: certificados de staging, no sirven para el navegador."
 fi
 
@@ -53,10 +61,19 @@ echo "→ Pidiendo el certificado a Let's Encrypt…"
 docker compose run --rm --entrypoint certbot certbot \
   certonly --webroot -w /var/www/certbot \
   $STAGING \
+  --cert-name "$NOMBRE_CERT" \
   --email "$CERTBOT_EMAIL" \
   --agree-tos --no-eff-email \
   --non-interactive \
   -d "$DOMINIO" -d "www.$DOMINIO" -d "$DOMINIO_APP"
+
+if [[ -n "$STAGING" ]]; then
+  echo
+  echo "Ensayo terminado sin errores. nginx NO se tocó: un certificado de"
+  echo "staging no sirve para el navegador."
+  echo "Ahora pedí el de verdad:   ./scripts/certificados.sh"
+  exit 0
+fi
 
 echo "→ Activando los server blocks de HTTPS…"
 for plantilla in nginx/plantillas/*.conf; do
