@@ -1,0 +1,379 @@
+<!doctype html>
+<!--
+  Fuente del manual en PDF. Para regenerarlo después de editarlo:
+
+    google-chrome --headless=new --no-pdf-header-footer \
+      --print-to-pdf=docs/manual-de-despliegue.pdf docs/manual-de-despliegue.html
+
+  Vive acá, al lado del PDF, para que el PDF nunca quede sin su original.
+-->
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Banco Orbital — Manual de despliegue</title>
+    <style>
+      @page { size: A4; margin: 18mm 16mm 16mm; }
+      /* La portada va a sangre: sin márgenes, el color llega al borde. */
+      @page :first { margin: 0; }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        font-family: "DejaVu Sans", system-ui, sans-serif;
+        font-size: 10.5pt;
+        line-height: 1.55;
+        color: #1c1c21;
+      }
+
+      code, pre { font-family: "DejaVu Sans Mono", ui-monospace, monospace; }
+
+      .portada {
+        height: 297mm;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        page-break-after: always;
+        background: linear-gradient(160deg, #1c0b2e 0%, #2d1548 55%, #0a0118 100%);
+        color: #fff;
+        padding: 0 24mm;
+      }
+
+      .portada .marca { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; }
+      .portada h1 { font-size: 30pt; line-height: 1.1; margin: 0 0 12px; font-weight: 600; }
+      .portada p { color: #c4b5fd; font-size: 12pt; margin: 0; max-width: 120mm; }
+      .portada .pie { margin-top: 48px; font-size: 9.5pt; color: #a78bfa; }
+
+      h2 {
+        font-size: 15pt; margin: 26px 0 4px; color: #2d1548;
+        border-bottom: 2px solid #e9d5ff; padding-bottom: 5px; page-break-after: avoid;
+      }
+
+      h3 { font-size: 11.5pt; margin: 18px 0 6px; color: #4c1d95; page-break-after: avoid; }
+      p { margin: 0 0 9px; }
+
+      .paso { page-break-inside: avoid; margin-bottom: 18px; }
+      .paso > h3 { display: flex; align-items: baseline; gap: 9px; margin-top: 0; }
+
+      .num {
+        display: inline-block; min-width: 22px; height: 22px; line-height: 22px;
+        text-align: center; border-radius: 50%;
+        background: #7c3aed; color: #fff; font-size: 9.5pt; font-weight: 700;
+      }
+
+      pre {
+        background: #f6f3fb; border: 1px solid #e4dcf3; border-left: 3px solid #a855f7;
+        border-radius: 5px; padding: 9px 12px; font-size: 9pt; line-height: 1.5;
+        white-space: pre-wrap; word-break: break-word; margin: 8px 0 10px;
+        page-break-inside: avoid;
+      }
+
+      .nota, .ojo, .ok { padding: 8px 12px; margin: 9px 0; font-size: 9.5pt; page-break-inside: avoid; }
+      .nota { background: #fff8e6; border-left: 3px solid #e0a800; }
+      .ojo  { background: #fdeaea; border-left: 3px solid #d9534f; }
+      .ok   { background: #eaf7ee; border-left: 3px solid #2e9e52; }
+
+      .etiqueta { font-weight: 700; }
+
+      table {
+        page-break-inside: avoid; width: 100%; border-collapse: collapse;
+        font-size: 9.5pt; margin: 10px 0 14px;
+      }
+
+      th, td { border: 1px solid #ddd6ea; padding: 6px 9px; text-align: left; vertical-align: top; }
+      th { background: #f6f3fb; color: #2d1548; }
+
+      .esquema {
+        background: #12042f; color: #e9d5ff; border-radius: 6px; padding: 14px 16px;
+        font-size: 8.7pt; line-height: 1.45; white-space: pre; margin: 10px 0 14px; border: 0;
+      }
+
+      ul { margin: 0 0 10px; padding-left: 20px; }
+      li { margin-bottom: 4px; }
+      .salto { page-break-before: always; }
+    </style>
+  </head>
+
+  <body>
+    <section class="portada">
+      <div class="marca">
+        <svg width="46" height="46" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="22" fill="none" stroke="#C4B5FD" stroke-width="10" />
+          <circle cx="32" cy="32" r="22" fill="none" stroke="#8B5CF6" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="86.4 138.2" transform="rotate(-90 32 32)" />
+          <circle cx="32" cy="32" r="7" fill="#C4B5FD" />
+        </svg>
+        <span style="font-size: 17pt; letter-spacing: 0.02em">Banco Orbital</span>
+      </div>
+
+      <h1>Manual de despliegue</h1>
+      <p>Cómo poner el banco en internet, de cero a HTTPS, en un servidor de 6 dólares por mes.</p>
+
+      <div class="pie">Octubre de 2026 · orbital.net.ar</div>
+    </section>
+
+    <h2>Qué vas a montar</h2>
+
+    <p>
+      Cinco contenedores en un solo servidor. Sólo nginx está expuesto a internet: el resto vive en
+      una red interna y no se puede alcanzar desde afuera.
+    </p>
+
+    <div class="esquema">internet ──→ :443 nginx
+                ├── app.orbital.net.ar   el home banking
+                │      ├── /            → portal (React compilado)
+                │      ├── /api /auth   → backend (la API)
+                │      └── /webhooks/   → backend (avisos de Clerk)
+                └── orbital.net.ar       la landing
+
+    backend ──→ proveedores   (red interna, no sale a internet)
+    backend ──→ Supabase, Banco Central, DolarAPI, Gemini</div>
+
+    <div class="nota">
+      <span class="etiqueta">La base de datos no se instala.</span> Sigue siendo la de Supabase, que ya
+      está andando. El servidor sólo corre la aplicación.
+    </div>
+
+    <h3>Lo que necesitás antes de empezar</h3>
+    <ul>
+      <li>Una cuenta en DigitalOcean con una tarjeta cargada.</li>
+      <li>El dominio <code>orbital.net.ar</code> y acceso a su panel de DNS.</li>
+      <li>Las claves: la <code>DATABASE_URL</code> de Supabase, las de Clerk y la de Gemini.</li>
+      <li>Una clave SSH. Si no tenés, se crea con un comando (paso 1).</li>
+    </ul>
+
+    <p>Tiempo total: alrededor de una hora, más lo que tarde el DNS en propagar.</p>
+
+    <h2>Paso a paso</h2>
+
+    <div class="paso">
+      <h3><span class="num">1</span> Crear la clave SSH (si no tenés)</h3>
+      <pre>ssh-keygen -t ed25519 -C "maxi"
+cat ~/.ssh/id_ed25519.pub</pre>
+      <p>Lo que imprime el segundo comando es lo que vas a pegar en DigitalOcean.</p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">2</span> Crear el droplet</h3>
+      <table>
+        <tr><th>Sistema</th><td>Ubuntu 24.04 (LTS) x64</td></tr>
+        <tr><th>Tipo</th><td>Basic · Regular (SSD)</td></tr>
+        <tr><th>Plan</th><td><strong>US$ 6/mes</strong> — 1 GB RAM, 1 CPU, 25 GB SSD</td></tr>
+        <tr><th>Región</th><td>New York, la de mejor latencia desde Argentina</td></tr>
+        <tr><th>Autenticación</th><td>SSH Key → <em>New SSH Key</em> y pegás la del paso 1</td></tr>
+      </table>
+      <p>Anotá la IP que te asigna: se usa en todos los pasos que siguen.</p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">3</span> Delegar el dominio</h3>
+      <p>
+        En <strong>nic.ar</strong>, en el dominio → <em>Delegaciones</em>, cargá los nameservers de
+        DigitalOcean:
+      </p>
+      <pre>ns1.digitalocean.com
+ns2.digitalocean.com
+ns3.digitalocean.com</pre>
+      <p>
+        Después, en DigitalOcean → <em>Networking → Domains</em>, agregás <code>orbital.net.ar</code>
+        y creás tres registros <strong>A</strong> apuntando a la IP del droplet:
+      </p>
+      <table>
+        <tr><th>Hostname</th><th>Para qué</th></tr>
+        <tr><td><code>@</code></td><td>la landing</td></tr>
+        <tr><td><code>www</code></td><td>redirige a la landing</td></tr>
+        <tr><td><code>app</code></td><td>el home banking</td></tr>
+      </table>
+      <p>Comprobá que resuelva antes de seguir con los certificados:</p>
+      <pre>dig +short app.orbital.net.ar</pre>
+      <div class="ojo">
+        Si no devuelve la IP del droplet, <span class="etiqueta">esperá</span>: la delegación de
+        NIC.ar puede tardar horas. Si seguís igual, el certificado va a fallar, y Let's Encrypt sólo
+        permite 5 intentos fallidos por hora.
+      </div>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">4</span> Entrar y dejarlo seguro</h3>
+      <pre>ssh root@LA_IP
+
+adduser maxi &amp;&amp; usermod -aG sudo maxi
+rsync --archive --chown=maxi:maxi ~/.ssh /home/maxi
+
+ufw allow OpenSSH &amp;&amp; ufw allow 80 &amp;&amp; ufw allow 443 &amp;&amp; ufw --force enable
+apt update &amp;&amp; apt install -y unattended-upgrades</pre>
+      <p>Queda abierto sólo SSH, HTTP y HTTPS, y los parches de seguridad se instalan solos.</p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">5</span> Swap y Docker</h3>
+      <pre>fallocate -l 1G /swapfile &amp;&amp; chmod 600 /swapfile
+mkswap /swapfile &amp;&amp; swapon /swapfile
+echo '/swapfile none swap sw 0 0' &gt;&gt; /etc/fstab
+
+curl -fsSL https://get.docker.com | sh
+usermod -aG docker maxi
+exit</pre>
+      <p>
+        Con 1 GB la swap es una red de seguridad, no una necesidad. Después de agregar el usuario al
+        grupo <code>docker</code> hay que volver a entrar: <code>ssh maxi@LA_IP</code>
+      </p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">6</span> Traer el código</h3>
+      <pre>sudo mkdir -p /opt/orbital &amp;&amp; sudo chown maxi:maxi /opt/orbital
+cd /opt/orbital
+
+for r in backend frontend proveedores landing infra; do
+  git clone https://github.com/maxibertaina03/banco-$r.git
+done</pre>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">7</span> Cargar las claves</h3>
+      <pre>cd /opt/orbital/banco-infra
+cp .env.example .env
+cp env/backend.env.example env/backend.env
+cp env/proveedores.env.example env/proveedores.env
+
+nano .env               # dominios, mail y clave publicable de Clerk
+nano env/backend.env    # base de datos, Clerk, Gemini
+nano env/proveedores.env
+
+chmod 600 .env env/*.env</pre>
+      <div class="nota">
+        <span class="etiqueta">La base de datos.</span> En <code>DATABASE_URL</code> usá la dirección
+        del <em>Session Pooler</em> de Supabase (Connect → Session pooler), no la conexión directa:
+        el servidor sale a internet por IPv4 y la conexión directa puede no estar disponible por ahí.
+      </div>
+      <div class="ojo">
+        Estos archivos tienen contraseñas. Nunca se suben a GitHub: viven solamente en el servidor.
+      </div>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">8</span> Levantar todo</h3>
+      <pre>docker compose up -d --build
+docker compose ps</pre>
+      <p>La primera vez tarda unos minutos: tiene que compilar el portal y la landing.</p>
+      <div class="ok">
+        Los servicios con chequeo de salud deben decir <code>healthy</code>. Para probar la API sin
+        tener todavía el dominio:
+        <br />
+        <code>docker compose exec -T backend node -e "fetch('http://127.0.0.1:3001/api/health').then(r=&gt;r.json()).then(j=&gt;console.log(j))"</code>
+      </div>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">9</span> Sacar los certificados de HTTPS</h3>
+      <pre>./scripts/certificados.sh --prueba   # ensayo, no gasta intentos
+./scripts/certificados.sh            # los de verdad</pre>
+      <p>
+        El script pide el certificado, activa HTTPS y recarga nginx. Las renovaciones después se
+        hacen solas: hay un contenedor que se encarga cada doce horas.
+      </p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">10</span> Avisarle a Clerk</h3>
+      <ul>
+        <li>Agregar <code>https://app.orbital.net.ar</code> a los dominios permitidos.</li>
+        <li>Apuntar el webhook a <code>https://app.orbital.net.ar/webhooks/clerk</code>.</li>
+      </ul>
+      <p>
+        Con las claves de desarrollo el portal funciona igual, con un cartelito que dice
+        "Development mode". Pasar a producción se puede hacer después.
+      </p>
+    </div>
+
+    <div class="paso">
+      <h3><span class="num">11</span> Comprobar que quedó bien</h3>
+      <pre>curl -s https://app.orbital.net.ar/api/health
+curl -I https://orbital.net.ar
+docker compose run --rm --entrypoint certbot certbot renew --dry-run</pre>
+      <p>
+        El primero tiene que responder <code>"ok":true</code> y <code>"db":"connected"</code>. El
+        tercero confirma que el certificado se va a renovar solo dentro de 60 días.
+      </p>
+      <div class="ok">
+        <span class="etiqueta">La prueba final:</span> reiniciá el servidor con
+        <code>sudo reboot</code> y esperá un minuto. Si todo vuelve solo, el banco quedó realmente
+        "en la nube". Después entrá desde el celular con datos móviles, que valida el dominio, el
+        certificado y el diseño en pantalla chica de una sola vez.
+      </div>
+    </div>
+
+    <h2 class="salto">El día a día</h2>
+
+    <p>Todo se hace desde <code>/opt/orbital/banco-infra</code>.</p>
+
+    <table>
+      <tr><th style="width: 46%">Comando</th><th>Qué hace</th></tr>
+      <tr><td><code>./scripts/deploy.sh</code></td><td>Trae los cambios de GitHub y actualiza todo</td></tr>
+      <tr><td><code>./scripts/deploy.sh backend</code></td><td>Actualiza un solo servicio</td></tr>
+      <tr><td><code>docker compose ps</code></td><td>Ver qué está corriendo y cómo está de salud</td></tr>
+      <tr><td><code>docker compose logs -f backend</code></td><td>Mirar la API en vivo</td></tr>
+      <tr><td><code>docker compose restart backend</code></td><td>Reiniciar sin cortar operaciones en curso</td></tr>
+      <tr><td><code>free -h</code> &nbsp;/&nbsp; <code>df -h /</code></td><td>Memoria y espacio en disco</td></tr>
+    </table>
+
+    <div class="nota">
+      <span class="etiqueta">Las migraciones de la base no las corre el servidor.</span> Se siguen
+      aplicando desde tu computadora contra Supabase, como venías haciendo. Es a propósito: así es
+      muy difícil romper la base sin querer.
+    </div>
+
+    <h2>Si algo falla</h2>
+
+    <table>
+      <tr><th style="width: 34%">Qué ves</th><th>Qué mirar</th></tr>
+      <tr>
+        <td><code>502 Bad Gateway</code></td>
+        <td>Algún contenedor se cayó. <code>docker compose ps</code> y después
+            <code>docker compose logs backend</code>.</td>
+      </tr>
+      <tr>
+        <td>El portal carga en blanco</td>
+        <td>Casi siempre es el navegador con el archivo viejo en caché. Recargá con
+            <code>Ctrl + Shift + R</code>.</td>
+      </tr>
+      <tr>
+        <td>No aparece el login de Clerk</td>
+        <td>El dominio no está permitido en Clerk, o la clave con la que se compiló está mal. Ojo:
+            cambiar esa clave obliga a reconstruir, no alcanza con reiniciar.</td>
+      </tr>
+      <tr>
+        <td><code>"db":"disconnected"</code></td>
+        <td>La <code>DATABASE_URL</code>, o Supabase pausó el proyecto por inactividad.</td>
+      </tr>
+      <tr>
+        <td>El certificado no sale</td>
+        <td>Casi siempre el DNS todavía no resolvía. Verificá con <code>dig +short app.orbital.net.ar</code>
+            y reintentá con <code>--prueba</code> para no gastar intentos.</td>
+      </tr>
+      <tr>
+        <td>No queda espacio en disco</td>
+        <td><code>docker system prune -af</code>. <strong>Sin</strong> <code>--volumes</code>: esa
+            bandera borraría los certificados.</td>
+      </tr>
+    </table>
+
+    <h2>Cuánto cuesta</h2>
+
+    <table>
+      <tr><th>Concepto</th><th>Precio</th></tr>
+      <tr><td>Droplet de DigitalOcean (1 GB)</td><td>US$ 6 por mes</td></tr>
+      <tr><td>Dominio <code>orbital.net.ar</code></td><td>$ 8.500 por año</td></tr>
+      <tr><td>Supabase (base de datos)</td><td>gratis</td></tr>
+      <tr><td>Clerk (autenticación)</td><td>gratis</td></tr>
+      <tr><td>Certificados Let's Encrypt</td><td>gratis</td></tr>
+      <tr><th>Total</th><th>US$ 6 por mes + el dominio una vez al año</th></tr>
+    </table>
+
+    <p style="margin-top: 26px; font-size: 9pt; color: #6b6b76; border-top: 1px solid #ddd6ea; padding-top: 10px">
+      La versión larga de este manual, con el detalle técnico de cada archivo, está en el
+      <code>README.md</code> del repositorio <code>banco-infra</code>.
+    </p>
+  </body>
+</html>

@@ -8,11 +8,11 @@ la API, el mock de proveedores, el portal compilado y el nginx que los reparte.
 
 ```
 internet ─→ :443 nginx
-              ├── app.orbitalbank.com.ar
+              ├── app.orbital.net.ar
               │     ├── /            → frontend (el portal ya compilado)
               │     ├── /api  /auth  → backend:3001
               │     └── /webhooks/   → backend:3001   (Clerk)
-              └── orbitalbank.com.ar → landing/
+              └── orbital.net.ar → landing/
 ```
 
 ---
@@ -99,7 +99,7 @@ En el panel del dominio, tres registros **A** apuntando a la IP del droplet:
 Antes de seguir, esperar a que resuelvan (puede tardar de minutos a unas horas):
 
 ```bash
-dig +short app.orbitalbank.com.ar
+dig +short app.orbital.net.ar
 ```
 
 Si no devuelve la IP del droplet, **no sigas**: certbot va a fallar y Let's
@@ -144,8 +144,8 @@ nginx. Las renovaciones después las hace solo el contenedor `certbot`.
 
 En el dashboard de Clerk:
 
-- Agregar `https://app.orbitalbank.com.ar` a los dominios permitidos.
-- Apuntar el webhook a `https://app.orbitalbank.com.ar/webhooks/clerk`.
+- Agregar `https://app.orbital.net.ar` a los dominios permitidos.
+- Apuntar el webhook a `https://app.orbital.net.ar/webhooks/clerk`.
 
 Con las claves de desarrollo (`pk_test_…`) el portal funciona, con el cartel de
 "Development mode". Pasar a una instancia de producción pide cargar unos CNAME
@@ -155,8 +155,8 @@ en el dominio; se puede hacer después sin tocar nada de acá salvo las claves
 ### 8. Comprobar que quedó bien
 
 ```bash
-curl -s https://app.orbitalbank.com.ar/api/health    # ok:true, db:connected
-curl -I https://orbitalbank.com.ar                   # la landing, 200
+curl -s https://app.orbital.net.ar/api/health    # ok:true, db:connected
+curl -I https://orbital.net.ar                   # la landing, 200
 docker compose ps                                    # todos healthy
 
 # Que la renovación automática va a funcionar en 60 días:
