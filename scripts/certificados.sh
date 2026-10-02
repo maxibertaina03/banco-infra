@@ -29,7 +29,10 @@ set -a; source .env; set +a
 
 : "${DOMINIO:?Falta DOMINIO en .env}"
 : "${DOMINIO_APP:?Falta DOMINIO_APP en .env}"
-: "${CERTBOT_EMAIL:?Falta CERTBOT_EMAIL en .env (Let's Encrypt avisa ahí si algo falla)}"
+# Ojo con los apóstrofos acá adentro: dentro de ${VAR:?mensaje} bash los trata
+# como comilla de apertura y se come el resto del archivo. Por eso dice
+# "la autoridad" y no "Let's Encrypt".
+: "${CERTBOT_EMAIL:?Falta CERTBOT_EMAIL en .env (es donde la autoridad avisa si algo falla)}"
 
 STAGING=""
 if [[ "${1:-}" == "--prueba" ]]; then
