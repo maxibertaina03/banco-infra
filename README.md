@@ -193,6 +193,56 @@ romper la base por accidente.
 
 ---
 
+## Respaldos
+
+```bash
+./scripts/respaldo.sh            # un dump comprimido en /opt/orbital/respaldos
+./scripts/respaldo.sh --listar   # qué hay guardado
+```
+
+**El snapshot de DigitalOcean no respalda el banco.** Respalda el droplet:
+nginx, los `.env`, los contenedores. Los datos —cuentas, saldos, transferencias,
+auditoría— están en Supabase, que es otra máquina de otra empresa. Si se pierde
+ese proyecto, el snapshot del droplet no recupera ni una transferencia. Para eso
+está este script.
+
+Vale la pena tener los dos: el snapshot te ahorra reinstalar el servidor, el
+dump te salva los datos.
+
+Para que corra solo todos los días a las 4 de la mañana:
+
+```bash
+crontab -e
+# y agregar:
+0 4 * * * cd /opt/orbital/banco-infra && ./scripts/respaldo.sh >> /var/log/respaldo-orbital.log 2>&1
+```
+
+Guarda 14 días y borra lo más viejo (`DIAS_A_GUARDAR` lo cambia). Cada dump pesa
+unos 80 KB hoy, así que el disco no es problema por un buen rato.
+
+Dos detalles que el script resuelve y conviene saber:
+
+- `pg_dump` tiene que ser de versión mayor o igual a la del servidor. Supabase
+  corre PostgreSQL 17 y Ubuntu 24.04 trae el cliente 16, así que instalarlo con
+  apt no funciona: el script lo corre dentro de un contenedor `postgres:17`.
+- Si el dump se corta a la mitad, **borra el archivo**. Un respaldo incompleto
+  que parece bueno es peor que no tener ninguno.
+
+Para restaurar sobre una base vacía:
+
+```bash
+zcat respaldos/orbital-AAAAMMDD-HHMM.sql.gz | psql "$DATABASE_URL"
+```
+
+El dump se genera con `--clean --if-exists`, así que también se puede restaurar
+encima de una base con datos: borra lo que haya y lo reemplaza. Obviamente, eso
+es destructivo.
+
+> Los respaldos quedan en el mismo droplet. Si se pierde el droplet, se pierden.
+> Bajate uno de vez en cuando con `scp` y guardalo en otro lado.
+
+---
+
 ## Cuando algo falla
 
 | Síntoma | Qué mirar |

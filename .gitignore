@@ -5,3 +5,7 @@ env/*.env
 
 # Lo genera scripts/certificados.sh a partir de nginx/plantillas/.
 nginx/https.d/*.conf
+
+# Por si alguien corre el respaldo con RESPALDOS_DIR adentro del repo.
+respaldos/
+*.sql.gz
