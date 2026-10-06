@@ -3,6 +3,11 @@
 Todo lo que hace falta para que Banco Orbital viva en un servidor: los
 contenedores, nginx, los certificados y el deploy.
 
+> **¿Buscás la documentación del proyecto entero?** Está en
+> [`docs/documentacion-del-proyecto.md`](docs/documentacion-del-proyecto.md), con su
+> PDF al lado. El Markdown es la fuente: se edita ahí y el PDF se regenera con
+> `./scripts/armar-pdf.py docs/documentacion-del-proyecto.md`.
+
 La base de datos **no** está acá: sigue siendo la de Supabase. Este repo levanta
 la API, el mock de proveedores, el portal compilado y el nginx que los reparte.
 
