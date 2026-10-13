@@ -2,7 +2,7 @@
 
 **Cómo está construido Banco Orbital, parte por parte.**
 
-Octubre de 2026 · [orbital.net.ar](https://orbital.net.ar) · Máximo Bertaina y Gonzalo Castelli
+Octubre de 2026 · [orbital.net.ar](https://orbital.net.ar) · Máximo Bertaina y Gonzalo Castellano
 
 ---
 
@@ -461,4 +461,4 @@ Portal en `http://localhost:8080`.
 
 ---
 
-*Banco Orbital — Máximo Bertaina y Gonzalo Castelli · 2026*
+*Banco Orbital — Máximo Bertaina y Gonzalo Castellano · 2026*

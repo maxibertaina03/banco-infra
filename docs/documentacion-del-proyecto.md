@@ -2,7 +2,7 @@
 
 **Un home banking completo, construido entre dos personas, andando en internet.**
 
-Octubre de 2026 · [orbital.net.ar](https://orbital.net.ar) · Máximo Bertaina y Gonzalo Castelli
+Octubre de 2026 · [orbital.net.ar](https://orbital.net.ar) · Máximo Bertaina y Gonzalo Castellano
 
 ---
 
@@ -438,4 +438,4 @@ Esta lista existe para que nadie los vuelva a sufrir.
 
 ---
 
-*Banco Orbital — Máximo Bertaina y Gonzalo Castelli · 2026*
+*Banco Orbital — Máximo Bertaina y Gonzalo Castellano · 2026*
