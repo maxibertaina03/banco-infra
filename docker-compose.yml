@@ -1,5 +1,12 @@
 # Banco Orbital en el droplet.
 #
+# Las imágenes NO se construyen acá: las arma GitHub Actions en cada push a
+# main y las publica en ghcr.io. El droplet sólo las baja. Antes compilaba el
+# portal en el servidor y eso dejaba la máquina sin aire varios minutos.
+#
+# `VERSION` permite fijar una etiqueta concreta para volver atrás:
+#   VERSION=<sha> docker compose up -d backend
+#
 # Cinco contenedores, una sola puerta: nginx. El backend, el mock de
 # proveedores y los estáticos del portal viven en una red interna y no publican
 # ningún puerto al exterior.
@@ -25,8 +32,7 @@ services:
   # Sólo lo consume el backend por la red interna. No tiene `ports`: desde
   # internet no existe.
   proveedores:
-    build:
-      context: ../banco-proveedores
+    image: ghcr.io/${DUENO_GHCR:-maxibertaina03}/banco-proveedores:${VERSION:-latest}
     env_file:
       - ./env/proveedores.env
     environment:
@@ -39,8 +45,7 @@ services:
 
   # ── API del banco ───────────────────────────────────────────────────────────
   backend:
-    build:
-      context: ../banco-backend
+    image: ghcr.io/${DUENO_GHCR:-maxibertaina03}/banco-backend:${VERSION:-latest}
     env_file:
       - ./env/backend.env
     environment:
@@ -63,15 +68,11 @@ services:
     logging: *logs
 
   # ── Portal ya compilado ─────────────────────────────────────────────────────
-  # Las VITE_* se hornean en el bundle durante el build, así que cambiar la
-  # clave de Clerk obliga a reconstruir la imagen (no alcanza con reiniciar).
+  # Las VITE_* se hornean en el bundle durante el build, y el build ahora pasa
+  # en GitHub Actions: la clave de Clerk se configura allá como variable del
+  # repositorio, no acá. Cambiarla obliga a reconstruir la imagen.
   frontend:
-    build:
-      context: ../banco-frontend
-      args:
-        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}
-        VITE_API_BASE_URL: ""
-        VITE_PAGOS_MOCK: "false"
+    image: ghcr.io/${DUENO_GHCR:-maxibertaina03}/banco-frontend:${VERSION:-latest}
     restart: unless-stopped
     networks: [interna]
     logging: *logs
@@ -80,8 +81,7 @@ services:
   # La cara pública, en el dominio raíz. Es React compilado a estáticos: la
   # imagen final es nginx con el dist adentro, sin Node.
   landing:
-    build:
-      context: ../banco-landing
+    image: ghcr.io/${DUENO_GHCR:-maxibertaina03}/banco-landing:${VERSION:-latest}
     restart: unless-stopped
     networks: [interna]
     logging: *logs

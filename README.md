@@ -176,12 +176,35 @@ certificado y el responsive de una sola pasada.
 
 ---
 
+## Cómo se construye y se despliega
+
+Las imágenes **no se construyen en el droplet**. Cada push a `main` en
+`banco-backend`, `banco-frontend`, `banco-landing` o `banco-proveedores`
+dispara un workflow (`.github/workflows/imagen.yml`) que arma la imagen y la
+publica en `ghcr.io`. El servidor sólo la baja.
+
+```
+push a main  →  GitHub Actions  →  ghcr.io  →  ./scripts/deploy.sh  →  droplet
+```
+
+Antes el droplet clonaba los cuatro repos y compilaba ahí. En 1 GB de RAM el
+build del portal dejaba la máquina sin aire varios minutos —tanto que no se
+podía ni entrar por SSH mientras duraba— y obligaba a tener el código fuente y
+la clave de Clerk en el servidor. Ahora **el droplet sólo necesita este repo**.
+
+> La clave publicable de Clerk se hornea en el bundle durante el build, así que
+> va configurada en GitHub, no en el servidor: en `banco-frontend`,
+> **Settings → Secrets and variables → Actions → Variables**, como
+> `VITE_CLERK_PUBLISHABLE_KEY`. Cambiarla obliga a reconstruir la imagen.
+
+---
+
 ## El día a día
 
 ```bash
 cd /opt/orbital/banco-infra
 
-./scripts/deploy.sh              # traer cambios y actualizar todo
+./scripts/deploy.sh              # bajar las imágenes nuevas y actualizar
 ./scripts/deploy.sh backend      # sólo un servicio
 
 docker compose ps                # estado

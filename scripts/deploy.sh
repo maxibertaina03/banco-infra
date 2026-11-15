@@ -5,36 +5,35 @@
 #   ./scripts/deploy.sh              todo
 #   ./scripts/deploy.sh backend      sólo un servicio
 #
-# Trae los cambios de los cuatro repos, reconstruye lo que haga falta y limpia
-# la basura del build. Ese último paso no es opcional: el disco es de 10 GB y
-# las capas viejas de Docker lo llenan en pocos deploys.
+# Baja las imágenes que GitHub Actions ya construyó y reinicia lo que cambió.
+#
+# Antes esto clonaba los cuatro repos y compilaba acá. En 1 GB de RAM el build
+# del portal dejaba la máquina sin aire varios minutos —tanto que no se podía
+# ni entrar por SSH mientras duraba— y obligaba a tener el código fuente y la
+# clave de Clerk en el servidor. Ahora el servidor sólo necesita este repo.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
-RAIZ="$(cd .. && pwd)"
 
 SERVICIO="${1:-}"
 
-echo "→ Trayendo cambios"
-for repo in banco-backend banco-frontend banco-proveedores banco-landing banco-infra; do
-  if [[ -d "$RAIZ/$repo/.git" ]]; then
-    printf '   %-20s ' "$repo"
-    git -C "$RAIZ/$repo" pull --ff-only --quiet && git -C "$RAIZ/$repo" log -1 --format='%h %s'
-  fi
-done
+echo "→ Trayendo los cambios de la infraestructura"
+git pull --ff-only --quiet && git log -1 --format='   %h %s'
 
-echo "→ Construyendo y levantando"
-# En 512 MB el build del frontend se apoya en la swap y tarda unos minutos:
-# es normal que parezca colgado en "transforming".
-docker compose up -d --build $SERVICIO
+echo "→ Bajando las imágenes de ghcr.io"
+# Si una imagen no cambió, `pull` no baja nada y termina al instante.
+docker compose pull $SERVICIO
+
+echo "→ Levantando"
+docker compose up -d $SERVICIO
 
 echo "→ Esperando a que estén sanos"
-sleep 15
+sleep 12
 docker compose ps
 
-echo "→ Limpiando capas viejas"
-docker builder prune -f >/dev/null
+echo "→ Limpiando imágenes viejas"
+# Sin esto, cada deploy deja atrás la imagen anterior y el disco se llena.
 docker image prune -f >/dev/null
 df -h / | tail -1
 

@@ -336,12 +336,26 @@ se lo comen.
 - **Cloudflare adelante**, con `set_real_ip_from` sobre sus rangos para que la IP del cliente
   llegue de verdad.
 
+### Cómo se construye
+
+Las imágenes **no se arman en el droplet**. Cada push a `main` dispara un
+workflow (`.github/workflows/imagen.yml`) que las construye en GitHub Actions y
+las publica en `ghcr.io`; el servidor sólo las baja.
+
+```
+push a main  →  GitHub Actions  →  ghcr.io  →  ./scripts/deploy.sh  →  droplet
+```
+
+Antes el droplet clonaba los cuatro repos y compilaba ahí: en 1 GB el build del
+portal lo dejaba sin aire varios minutos y obligaba a tener el código fuente y
+la clave de Clerk en el servidor.
+
 ### Los comandos
 
 ```bash
 cd /opt/orbital/banco-infra
 
-./scripts/deploy.sh              # traer cambios y actualizar
+./scripts/deploy.sh              # bajar las imágenes nuevas y actualizar
 ./scripts/deploy.sh backend      # sólo un servicio
 ./scripts/respaldo.sh            # un dump comprimido de la base
 ./scripts/certificados.sh        # emitir o renovar certificados
@@ -350,13 +364,121 @@ docker compose ps                # estado
 docker compose logs -f backend   # mirar la API
 ```
 
-> **El build ahoga la máquina.** Compilar el portal en 1 GB consume toda la memoria mientras
-> dura. Si justo después no se puede entrar por SSH, no es la clave ni el servidor caído: hay
-> que esperar dos minutos.
+> Desde que las imágenes se construyen en GitHub Actions, el deploy ya no ahoga la máquina:
+> bajar las imágenes e intercambiar los contenedores son segundos.
 
 ---
 
-## 8. Seguridad
+## 8. El modo prueba
+
+Un usuario al que se entra **escaneando un QR**, sin registrarse: ya tiene
+cuenta con plata y movimientos, opera como un cliente cualquiera, y al cerrar
+la sesión no queda nada. Lo pidió la cátedra como cierre de regularización.
+
+**No es una maqueta.** Lo que se aísla no es el sistema, son los datos: el
+visitante usa los mismos endpoints, las mismas validaciones y los mismos
+cálculos que un cliente real. Su persona, su cuenta y su historial viven en un
+espacio que después se tira.
+
+### Cómo entra
+
+```
+QR → /demo → POST /api/demo/sesiones → token → sessionStorage → el portal
+```
+
+El token viaja por `Authorization: Bearer`, el mismo header que Clerk: un
+header propio quedaría bloqueado por el CORS. En el backend,
+`src/middlewares/autenticar.js` reemplazó a `clerkAuth + requireActiveUser` y
+acepta las dos credenciales. En los dos casos deja `req.usuarioActual` con la
+**misma forma**, así que de ahí para abajo nada se entera de la diferencia.
+
+Una sola cadena de código, no un router espejo: si el demo entrara por otra
+puerta, lo que se probaría sería una copia del banco y no el banco.
+
+### Dónde viven los datos
+
+En las mismas tablas, con `personas.es_demo` como marca. El aislamiento sale
+gratis porque **todo el backend ya está scopeado por `persona_id`**: no hubo
+que tocar ni una query de lectura. Sólo se filtran los tres lugares donde una
+persona de prueba no debe aparecer: el listado del admin, los reportes y las
+consultas que arman la sincronización con el Banco Central.
+
+### Cómo no sale al Banco Central
+
+El Central es un ambiente compartido con todo el curso. `el-central.js` elige
+entre el real y `central-bank-simulado.js` según `usuarioActual.es_demo`, y los
+call sites pasaron de `centralBankService.x(…)` a `elCentral(usuarioActual).x(…)`.
+
+El selector se construye **con el `centralBankService` inyectado**, para que los
+tests que pasan un doble lo sigan viendo.
+
+### Los dos mundos no se tocan
+
+Si el visitante tipea el CBU de un cliente real, el flujo encontraría esa
+cuenta como destino local y le acreditaría plata **de verdad**; y al revés, un
+cliente real que transfiera a una cuenta de prueba perdería la plata cuando esa
+sesión se borre. La cuenta de la otra orilla se trata como si no existiera acá
+y la transferencia sale por el camino interbancario.
+
+Lo mismo con los cobros por QR, que es un escenario realista: en una
+presentación alguien le muestra a la sesión de prueba el QR de un cliente real.
+
+### Qué se siembra
+
+Caja en pesos con **$850.000** (principal), caja en dólares con **US$ 1.200**,
+**13 movimientos** de los últimos 60 días y **3 destinatarios** en la agenda.
+Los movimientos usan los tipos y canales que ya existen en el catálogo. Los
+destinatarios tienen CBU de otro banco a propósito, para que la transferencia
+funcione de punta a punta sin poder tocar una cuenta real.
+
+### Cómo se borra
+
+Borrar la persona no alcanza: la cascada muere contra `bonificaciones`
+(RESTRICT), `transacciones` (NO ACTION), `cobros` (RESTRICT) y las claves de
+préstamos y plazos fijos hacia `cuentas`. El orden, todo en una transacción:
+
+```
+cobros → bonificaciones → transacciones → plazos_fijos → prestamos
+       → cuentas → personas (y ahí cascadea el resto)
+```
+
+Con un seguro: el `DELETE FROM personas` lleva `AND es_demo = TRUE`.
+
+Dos disparadores: el botón **"Salir y borrar mis datos"** y
+`limpiador-de-demos.js`, que cada 10 minutos barre las sesiones vencidas. El
+TTL es de **45 minutos**.
+
+### Qué puede y qué no
+
+| Puede | No puede |
+|---|---|
+| Transferir dentro y fuera del banco | Ver o tocar datos de un cliente real |
+| Comprar y vender dólares | Hacer que entre o salga plata real |
+| Pagar servicios y recargar el celular | Llegar a las secciones internas |
+| Pedir tarjeta y préstamo, y que se los aprueben solos | Salir al Banco Central |
+| Constituir un plazo fijo, cobrar y escanear QR, usar el chatbot | |
+
+El rol `cliente` está **escrito en el middleware**, no leído de la base: ni un
+INSERT equivocado en `personas_roles` le da permisos internos.
+
+### Archivos
+
+| Archivo | Qué hace |
+|---|---|
+| `src/middlewares/autenticar.js` | La puerta: acepta las dos credenciales |
+| `src/modules/demo-service.js` | Crear, buscar, borrar y barrer sesiones |
+| `src/modules/demo-router.js` | Los tres endpoints |
+| `src/modules/el-central.js` | Elige qué Banco Central le toca |
+| `src/modules/central-bank-simulado.js` | El Central de mentira |
+| `src/modules/limpiador-de-demos.js` | La tarea de fondo |
+| `prisma/migrations/3_modo_demo/` | La migración |
+| `banco-frontend/src/features/demo/` | Entrada, cartel y API |
+| `banco-frontend/src/hooks/useSesion.ts` | Unifica Clerk y prueba |
+| `banco-landing/src/componentes/Prueba.tsx` | La sección con el QR |
+
+---
+
+## 9. Seguridad
 
 | | |
 |---|---|
@@ -388,14 +510,14 @@ registrado con su nombre.
 
 ---
 
-## 9. Los tests
+## 10. Los tests
 
-**414 en total**: 386 en el backend (33 archivos) y 28 en el portal (3 archivos). Corren con
+**438 en total**: 404 en el backend (36 archivos) y 34 en el portal (4 archivos). Corren con
 Vitest.
 
 ```bash
-cd banco-backend  && npx vitest run
-cd banco-frontend && npx vitest run
+cd banco-backend  && npx vitest run    # 404
+cd banco-frontend && npx vitest run    # 34
 ```
 
 Lo que se cubre en el backend: el value object `Dinero`, el cálculo financiero de préstamos y
@@ -413,7 +535,7 @@ gerente de punta a punta.
 
 ---
 
-## 10. Levantarlo en tu máquina
+## 11. Levantarlo en tu máquina
 
 ```bash
 # Backend
@@ -447,7 +569,7 @@ Portal en `http://localhost:8080`.
 
 ---
 
-## 11. Dónde está cada cosa
+## 12. Dónde está cada cosa
 
 | Documento | Qué hay adentro |
 |---|---|
